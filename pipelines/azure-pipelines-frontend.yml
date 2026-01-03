@@ -1,0 +1,100 @@
+trigger:
+  branches:
+    include:
+    - main
+    - dev
+  paths:
+    include:
+    - src/*
+    - public/*
+    - nginx.*.conf
+    - Dockerfile
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Dev
+    displayName: 'Dev Environment'
+    jobs:
+      - job: Build_Deploy_Dev
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Build and Push to ACR'
+            inputs:
+              azureSubscription: 'sc-azure-gopal'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr login --name gopaldevacr
+                docker build --build-arg NGINX_CONF=nginx.dev.conf -t gopaldevacr.azurecr.io/gopal-frontend:dev .
+                docker push gopaldevacr.azurecr.io/gopal-frontend:dev
+
+          - task: AzureCLI@2
+            displayName: 'Deploy to App Service'
+            inputs:
+              azureSubscription: 'sc-azure-gopal'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az webapp config container set \
+                  --resource-group rg-gopal-dev \
+                  --name app-gopal-ui-dev \
+                  --docker-custom-image-name gopaldevacr.azurecr.io/gopal-frontend:dev
+                az webapp restart --resource-group rg-gopal-dev --name app-gopal-ui-dev
+
+  - stage: QA
+    displayName: 'QA Environment'
+    dependsOn: Dev
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy_QA
+        environment: 'QA-Frontend'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: 'Build and Deploy to QA'
+                  inputs:
+                    azureSubscription: 'sc-azure-gopal'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az acr login --name gopalqaacr
+                      docker build --build-arg NGINX_CONF=nginx.qa.conf -t gopalqaacr.azurecr.io/gopal-frontend:qa .
+                      docker push gopalqaacr.azurecr.io/gopal-frontend:qa
+                      az webapp config container set \
+                        --resource-group rg-gopal-qa \
+                        --name app-gopal-ui-qa \
+                        --docker-custom-image-name gopalqaacr.azurecr.io/gopal-frontend:qa
+                      az webapp restart --resource-group rg-gopal-qa --name app-gopal-ui-qa
+
+  - stage: Prod
+    displayName: 'Prod Environment'
+    dependsOn: QA
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy_Prod
+        environment: 'Prod-Frontend'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: 'Build and Deploy to Prod'
+                  inputs:
+                    azureSubscription: 'sc-azure-gopal'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az acr login --name gopalprodacr
+                      docker build --build-arg NGINX_CONF=nginx.prod.conf -t gopalprodacr.azurecr.io/gopal-frontend:prod .
+                      docker push gopalprodacr.azurecr.io/gopal-frontend:prod
+                      az webapp config container set \
+                        --resource-group rg-gopal-prod \
+                        --name app-gopal-ui-prod \
+                        --docker-custom-image-name gopalprodacr.azurecr.io/gopal-frontend:prod
+                      az webapp restart --resource-group rg-gopal-prod --name app-gopal-ui-prod
