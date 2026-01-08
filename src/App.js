@@ -104,7 +104,7 @@ function App() {
     <div className="App">
       {/* Application Header */}
       <header className="App-header">
-        <h1>Gopal's Multi-Backend Image Upload</h1>
+        <h1>Gope's Multi-Backend Image Upload</h1>
         <p>Upload images to Backend-A or Backend-B</p>
       </header>
 
@@ -133,7 +133,7 @@ function App() {
           />
           <button onClick={handleUploadB} disabled={loading}>
             {loading ? "Uploading..." : "Upload to B"}
-          </button}
+          </button>
         </div>
       </div>
 
