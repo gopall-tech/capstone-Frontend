@@ -104,7 +104,7 @@ function App() {
     <div className="App">
       {/* Application Header */}
       <header className="App-header">
-        <h1>Gope's Multi-Backend Image Upload</h1>
+        <h1>Gopal's Multi-Backend Image Upload</h1>
         <p>Upload images to Backend-A or Backend-B</p>
       </header>
 
